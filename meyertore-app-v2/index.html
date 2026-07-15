@@ -19,8 +19,8 @@
   html=html.replace(/<link rel="manifest"[^>]*>/i,'<link rel="manifest" href="manifest.webmanifest">');
   html=html.replace(/href="(?!https?:|\/|#)([^\"]+)"/g,'href="../meyertore-app/$1"');
   html=html.replace(/src="(?!https?:|\/|data:)([^\"]+)"/g,'src="../meyertore-app/$1"');
-  html=html.replace('</head>','<link rel="stylesheet" href="beta.css"></head>');
-  html=html.replace('</body>','<script src="beta.js"><\/script><script src="beta-fix.js"><\/script></body>');
+  html=html.replace('</head>','<link rel="stylesheet" href="beta.css"><link rel="stylesheet" href="work-menu.css"></head>');
+  html=html.replace('</body>','<script src="beta.js"><\/script><script src="density-fix.js"><\/script><script src="work-menu.js"><\/script></body>');
   document.open();document.write(html);document.close();
  }catch(e){document.body.innerHTML='<div class="beta-error"><h2>Beta konnte nicht geladen werden</h2><p>Bitte Internetverbindung prüfen und neu laden.</p></div>'}
 })();
