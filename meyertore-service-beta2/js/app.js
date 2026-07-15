@@ -8,6 +8,12 @@
   const CURRENT_KEY = "meyer-tore-beta2-current";
   const MAX_PHOTOS = 12;
   const TOTAL_STEPS = 9;
+  const COMPANY_LOCATION = Object.freeze({
+    lat: 51.2209747,
+    lon: 7.1951181,
+    accuracy: 0,
+    address: "Am Stall 11, 42369 Wuppertal"
+  });
 
   let jobs = loadJobs();
   let currentStep = 1;
@@ -50,12 +56,13 @@
       updatedAt: now,
       completedAt: "",
       lastStep: 1,
+      workflow: { disabledSteps: [] },
       order: {
         number: makeOrderNumber(), date: localDate(), technician: "", type: "", appointment: "",
         priority: "Normal", reference: "", contract: "", description: ""
       },
       deployment: {
-        crewSize: "1", secondTechnician: "", tripStart: null, tripEnd: null,
+        crewSize: "1", secondTechnician: "", originType: "company", tripStart: null, tripEnd: null,
         distanceKm: "", distanceMethod: "", workStartedAt: "", workEndedAt: "",
         workMinutes: 0, personHours: 0
       },
@@ -90,11 +97,38 @@
     normalized.schema = "meyer-tore-job";
     normalized.schemaVersion = 3;
     normalized.deployment.crewSize = normalized.deployment.crewSize === "2" ? "2" : "1";
+    normalized.deployment.originType = normalized.deployment.originType === "customer" ? "customer" : "company";
     normalized.evidence.photos = Array.isArray(normalized.evidence.photos) ? normalized.evidence.photos.slice(0, MAX_PHOTOS) : [];
     normalized.drive.safety = Array.isArray(normalized.drive.safety) ? normalized.drive.safety : [];
     normalized.work.activities = Array.isArray(normalized.work.activities) ? normalized.work.activities : [];
     normalized.work.checklist = normalized.work.checklist && typeof normalized.work.checklist === "object" ? normalized.work.checklist : {};
+    normalized.workflow.disabledSteps = Array.isArray(normalized.workflow.disabledSteps)
+      ? [...new Set(normalized.workflow.disabledSteps.map(Number).filter((step) => step >= 2 && step <= 8))]
+      : [];
     return normalized;
+  }
+
+  function disabledSteps() {
+    return new Set(job.workflow.disabledSteps || []);
+  }
+
+  function activeSteps() {
+    const disabled = disabledSteps();
+    return Array.from({ length: TOTAL_STEPS }, (_, index) => index + 1)
+      .filter((step) => step === 1 || step === 9 || !disabled.has(step));
+  }
+
+  function nearestActiveStep(requested) {
+    const steps = activeSteps();
+    const value = Number(requested) || 1;
+    if (steps.includes(value)) return value;
+    return steps.find((step) => step > value) || steps[steps.length - 1];
+  }
+
+  function adjacentStep(direction) {
+    const steps = activeSteps();
+    const index = Math.max(0, steps.indexOf(currentStep));
+    return steps[Math.max(0, Math.min(steps.length - 1, index + direction))];
   }
 
   function loadJobs() {
@@ -262,6 +296,7 @@
   }
 
   function coordinateSummary(point) {
+    if (point.address) return `${point.address} · ${formatDate(point.capturedAt, true)}`;
     return `${point.lat.toFixed(6)}, ${point.lon.toFixed(6)} · ± ${Math.round(point.accuracy || 0)} m · ${formatDate(point.capturedAt, true)}`;
   }
 
@@ -284,14 +319,17 @@
     const crewSize = deployment.crewSize === "2" ? 2 : 1;
     const secondTechnician = $("#secondTechnicianField");
     secondTechnician.hidden = crewSize !== 2;
+    const companyOrigin = deployment.originType !== "customer";
 
     const startSummary = $("#tripStartSummary");
     if (deployment.tripStart) {
       startSummary.className = "route-point captured";
-      startSummary.innerHTML = `<i></i><div><strong>Firma · Am Stall 11</strong><small>${escapeHtml(coordinateSummary(deployment.tripStart))}</small></div>`;
+      startSummary.innerHTML = `<i></i><div><strong>Start · ${companyOrigin ? "Firma" : "Kunde"}</strong><small>${escapeHtml(coordinateSummary(deployment.tripStart))}</small></div>`;
     } else {
       startSummary.className = "route-point";
-      startSummary.innerHTML = `<i></i><div><strong>Firma · Am Stall 11</strong><small>Abfahrt noch nicht erfasst</small></div>`;
+      startSummary.innerHTML = companyOrigin
+        ? `<i></i><div><strong>Start · Firma</strong><small>Am Stall 11, 42369 Wuppertal · wird automatisch gesetzt</small></div>`
+        : `<i></i><div><strong>Start · Kunde</strong><small>Aktueller Standort wird beim Fahrtstart per GPS abgerufen</small></div>`;
     }
 
     const endSummary = $("#tripEndSummary");
@@ -308,7 +346,7 @@
     $("#tripDistanceMethod").textContent = deployment.distanceMethod || "Wird nach der Ankunft automatisch berechnet";
     const tripMinutes = deployment.tripStart && deployment.tripEnd ? travel.durationMinutes(deployment.tripStart.capturedAt, deployment.tripEnd.capturedAt) : 0;
     $("#tripDurationValue").textContent = tripMinutes ? travel.formatDuration(tripMinutes) : "—";
-    $("#captureTripStart").textContent = deployment.tripStart ? "Abfahrt neu erfassen" : "Abfahrt Firma erfassen";
+    $("#captureTripStart").textContent = deployment.tripStart ? "Startpunkt neu setzen" : "Fahrt starten";
     $("#captureTripEnd").disabled = !deployment.tripStart;
 
     const active = Boolean(deployment.workStartedAt && !deployment.workEndedAt);
@@ -339,17 +377,20 @@
   }
 
   async function captureTripStart() {
-    if (job.deployment.tripStart && !confirm("Vorhandene Abfahrt und Strecke neu erfassen?")) return;
+    if (job.deployment.tripStart && !confirm("Vorhandenen Startpunkt und Strecke neu erfassen?")) return;
     const button = $("#captureTripStart");
     button.disabled = true;
-    button.textContent = "GPS wird ermittelt …";
+    const companyOrigin = job.deployment.originType !== "customer";
+    button.textContent = companyOrigin ? "Firmenstandort wird gesetzt …" : "GPS wird ermittelt …";
     try {
-      job.deployment.tripStart = await currentGpsPoint();
+      job.deployment.tripStart = companyOrigin
+        ? { ...COMPANY_LOCATION, capturedAt: new Date().toISOString() }
+        : await currentGpsPoint();
       job.deployment.tripEnd = null;
       job.deployment.distanceKm = "";
       job.deployment.distanceMethod = "";
       scheduleSave();
-      showToast("Abfahrt bei Meyer Tore wurde gespeichert.");
+      showToast(companyOrigin ? "Fahrt ab Firmenstandort wurde gestartet." : "Kundenstandort wurde als Startpunkt gespeichert.");
     } catch (error) {
       showToast(gpsErrorMessage(error), true);
     } finally {
@@ -360,7 +401,7 @@
 
   async function captureTripEnd() {
     if (!job.deployment.tripStart) {
-      showToast("Bitte zuerst die Abfahrt bei der Firma erfassen.", true);
+      showToast("Bitte zuerst den Startpunkt der Fahrt erfassen.", true);
       return;
     }
     const button = $("#captureTripEnd");
@@ -441,6 +482,7 @@
   function readBoundField(element) {
     const path = element.dataset.bind;
     if (!path) return;
+    const previousValue = getPath(job, path);
     if (element.type === "radio") {
       if (element.checked) setPath(job, path, element.value);
     } else if (element.type === "checkbox") {
@@ -457,6 +499,13 @@
     if (path === "deployment.distanceKm") job.deployment.distanceMethod = "Manuell eingetragen";
     if (path === "deployment.crewSize") {
       if (job.deployment.workEndedAt) updateCalculatedWorkTime();
+      renderDeployment();
+    }
+    if (path === "deployment.originType" && previousValue !== job.deployment.originType) {
+      job.deployment.tripStart = null;
+      job.deployment.tripEnd = null;
+      job.deployment.distanceKm = "";
+      job.deployment.distanceMethod = "";
       renderDeployment();
     }
     scheduleSave();
@@ -622,8 +671,10 @@
   }
 
   function updateStepStates() {
+    const disabled = disabledSteps();
     $$("#stepNavigation button").forEach((button) => {
       const step = Number(button.dataset.step);
+      button.hidden = disabled.has(step);
       button.classList.toggle("active", step === currentStep);
       button.classList.toggle("complete", step !== currentStep && stepComplete(step));
       button.setAttribute("aria-current", step === currentStep ? "step" : "false");
@@ -653,15 +704,17 @@
   }
 
   function showStep(step, options = {}) {
-    const next = Math.max(1, Math.min(TOTAL_STEPS, Number(step) || 1));
+    const next = nearestActiveStep(Math.max(1, Math.min(TOTAL_STEPS, Number(step) || 1)));
+    const steps = activeSteps();
+    const position = steps.indexOf(next);
     currentStep = next;
     $$("[data-step-panel]").forEach((panel) => { panel.hidden = Number(panel.dataset.stepPanel) !== next; });
-    $("#progressText").textContent = `${next} von ${TOTAL_STEPS}`;
-    $("#mobileProgressLabel").textContent = `Schritt ${next} von ${TOTAL_STEPS}`;
-    $("#mobileProgressBar").style.width = `${(next / TOTAL_STEPS) * 100}%`;
-    $("#prevStep").disabled = next === 1;
-    $("#prevStep").style.visibility = next === 1 ? "hidden" : "visible";
-    $("#nextStep").textContent = next === 8 ? "Bericht erstellen →" : "Weiter →";
+    $("#progressText").textContent = `${position + 1} von ${steps.length}`;
+    $("#mobileProgressLabel").textContent = `Schritt ${position + 1} von ${steps.length}`;
+    $("#mobileProgressBar").style.width = `${((position + 1) / steps.length) * 100}%`;
+    $("#prevStep").disabled = position === 0;
+    $("#prevStep").style.visibility = position === 0 ? "hidden" : "visible";
+    $("#nextStep").textContent = steps[position + 1] === 9 ? "Bericht erstellen →" : "Weiter →";
     $(".workspace-footer").style.display = next === 9 ? "none" : "flex";
     updateStepStates();
     if (next === 1) renderDeployment();
@@ -682,18 +735,34 @@
 
   function validationIssues() {
     const issues = [];
+    const enabled = new Set(activeSteps());
     if (!job.order.number) issues.push({ step: 1, text: "Auftragsnummer fehlt" });
     if (!job.order.date) issues.push({ step: 1, text: "Auftragsdatum fehlt" });
     if (!job.order.technician) issues.push({ step: 1, text: "Techniker fehlt" });
     if (!job.order.type) issues.push({ step: 1, text: "Auftragsart fehlt" });
-    if (!job.customer.company) issues.push({ step: 2, text: "Kunde / Betreiber fehlt" });
-    if (!job.site.name) issues.push({ step: 3, text: "Anlagenstandort fehlt" });
-    if (!job.asset.category) issues.push({ step: 4, text: "Torart fehlt" });
-    if (!job.asset.model || (job.asset.model === "other-model" && !job.asset.customModel)) issues.push({ step: 4, text: "Tormodell fehlt" });
+    if (enabled.has(2) && !job.customer.company) issues.push({ step: 2, text: "Kunde / Betreiber fehlt" });
+    if (enabled.has(3) && !job.site.name) issues.push({ step: 3, text: "Anlagenstandort fehlt" });
+    if (enabled.has(4) && !job.asset.category) issues.push({ step: 4, text: "Torart fehlt" });
+    if (enabled.has(4) && (!job.asset.model || (job.asset.model === "other-model" && !job.asset.customModel))) issues.push({ step: 4, text: "Tormodell fehlt" });
     const stats = checklistStats();
-    if (stats.checked < stats.total) issues.push({ step: 6, text: `${stats.total - stats.checked} Prüfpunkte sind noch offen` });
-    if (!job.report.result) issues.push({ step: 8, text: "Abschließendes Ergebnis fehlt" });
+    if (enabled.has(6) && stats.checked < stats.total) issues.push({ step: 6, text: `${stats.total - stats.checked} Prüfpunkte sind noch offen` });
+    if (enabled.has(8) && !job.report.result) issues.push({ step: 8, text: "Abschließendes Ergebnis fehlt" });
     return issues;
+  }
+
+  function openWorkflowSettings() {
+    const disabled = disabledSteps();
+    $$('[data-workflow-step]').forEach((input) => { input.checked = !disabled.has(Number(input.dataset.workflowStep)); });
+    $("#workflowDialog").showModal();
+  }
+
+  function saveWorkflowSettings() {
+    job.workflow.disabledSteps = $$('[data-workflow-step]')
+      .filter((input) => !input.checked)
+      .map((input) => Number(input.dataset.workflowStep));
+    $("#workflowDialog").close();
+    showStep(currentStep, { keepScroll: true });
+    showToast(`${activeSteps().length} Schritte im Ablauf aktiv.`);
   }
 
   function renderReview() {
@@ -1088,7 +1157,7 @@
     renderChecklist();
     renderGps();
     renderPhotos();
-    showStep(Math.max(1, Math.min(TOTAL_STEPS, Number(job.lastStep) || 1)), { skipSave: true, keepScroll: true });
+    showStep(nearestActiveStep(job.lastStep), { skipSave: true, keepScroll: true });
     updateStepStates();
     updateHeader();
   }
@@ -1102,8 +1171,13 @@
     $$('[data-array]').forEach((element) => element.addEventListener("change", () => readArrayField(element)));
 
     $$("#stepNavigation button").forEach((button) => button.addEventListener("click", () => showStep(Number(button.dataset.step))));
-    $("#prevStep").addEventListener("click", () => showStep(currentStep - 1));
-    $("#nextStep").addEventListener("click", () => { if (validateCurrentStep()) showStep(currentStep + 1); });
+    $("#prevStep").addEventListener("click", () => showStep(adjacentStep(-1)));
+    $("#nextStep").addEventListener("click", () => { if (validateCurrentStep()) showStep(adjacentStep(1)); });
+    $$(".open-workflow-settings").forEach((button) => button.addEventListener("click", openWorkflowSettings));
+    $("#enableAllSteps").addEventListener("click", () => {
+      $$('[data-workflow-step]').forEach((input) => { input.checked = true; });
+    });
+    $("#saveWorkflowSettings").addEventListener("click", saveWorkflowSettings);
 
     $("#checklistRows").addEventListener("click", (event) => {
       const button = event.target.closest("button[data-status]");
