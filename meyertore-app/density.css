@@ -1,0 +1,13 @@
+/* Einstellbare mobile Darstellungsdichte; Drucklayout bleibt unverändert */
+.density-card{padding:14px}.density-card h3{margin:0 0 6px}.density-card p{margin:0 0 10px;color:#58665e;font-size:13px}.density-options{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.density-option{min-height:44px;border:1px solid #9dac9f;border-radius:9px;background:#fff;color:#18211c;font-weight:700}.density-option.active{background:#174c2f;color:#fff;border-color:#174c2f}
+@media(max-width:900px){
+ body.density-compact main{padding:6px} body.density-compact .card{padding:8px;margin:6px 0;border-radius:9px} body.density-compact .document-head{padding:7px} body.density-compact .document-head h2{font-size:18px} body.density-compact .document-head p{font-size:12px;margin-top:2px}
+ body.density-compact .form-grid{gap:6px;grid-template-columns:repeat(2,minmax(0,1fr))} body.density-compact .wide{grid-column:1/-1} body.density-compact label{gap:3px;font-size:12px}
+ body.density-compact input[type=text],body.density-compact input[type=date],body.density-compact textarea,body.density-compact select{min-height:34px;padding:6px 8px;font-size:16px;border-radius:7px} body.density-compact textarea{min-height:54px}
+ body.density-compact .check-line{min-height:32px;font-size:12px} body.density-compact .check-line input{width:20px;height:20px}
+ body.density-compact .status-legend,body.density-compact .inspect-row{grid-template-columns:minmax(0,1fr) repeat(3,42px)} body.density-compact .status-legend{font-size:9px;padding-bottom:3px} body.density-compact .inspect-row{padding:5px 0;gap:2px} body.density-compact .inspect-title{font-size:11px;line-height:1.15} body.density-compact .status-cell input{width:22px;height:22px}
+ body.density-compact .inspect-note{margin-top:2px} body.density-compact .inspect-note input{min-height:30px;font-size:14px} body.density-compact .section-heading{margin:9px 0 3px;font-size:15px}
+ body.density-compact .signature-launch{min-height:38px;font-size:13px} body.density-compact .signature-preview{height:70px} body.density-compact .actions{padding:6px;gap:5px} body.density-compact .actions button,body.density-compact .file-btn{padding:9px 10px;font-size:12px}
+ body.density-large main{padding:16px} body.density-large .card{padding:18px;margin:16px 0} body.density-large label{font-size:16px} body.density-large input[type=text],body.density-large input[type=date],body.density-large textarea,body.density-large select{min-height:54px;font-size:18px;padding:13px 14px} body.density-large .inspect-title{font-size:16px} body.density-large .inspect-row{padding:14px 0} body.density-large .status-cell input{width:32px;height:32px}
+}
+@media print{.density-card{display:none!important}}
