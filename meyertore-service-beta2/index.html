@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d2738">
+  <meta name="description" content="Meyer Tore Service-App für Aufträge, Prüfungen und digitale Berichte">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Meyer Tore">
+  <title>Meyer Tore – Service-App Beta 2.0</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/app-icon.svg">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand" aria-label="Meyer Tore Service-App">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span><strong>MEYER TORE</strong><small>Service-App · Beta 2.0</small></span>
+    </div>
+    <div class="header-center">
+      <span class="save-indicator" id="saveIndicator"><span></span> Gespeichert</span>
+      <span class="order-chip" id="headerOrderNumber">Neuer Auftrag</span>
+    </div>
+    <div class="header-actions">
+      <button class="icon-button" id="openJobs" type="button" title="Gespeicherte Aufträge" aria-label="Gespeicherte Aufträge">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+        <span>Aufträge</span>
+      </button>
+      <button class="icon-button" id="exportJob" type="button" title="Auftrag als Datei sichern" aria-label="Auftrag exportieren">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
+        <span>Sichern</span>
+      </button>
+      <label class="icon-button file-button" title="Auftragsdatei laden">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V7h6l2 2h8v10H4Z"/></svg>
+        <span>Laden</span>
+        <input id="importJob" type="file" accept="application/json,.json">
+      </label>
+      <button class="icon-button" id="installApp" type="button" title="App installieren" aria-label="App installieren" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg>
+        <span>Installieren</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="step-rail" aria-label="Auftragsablauf">
+      <div class="rail-intro">
+        <span>Arbeitsablauf</span>
+        <strong id="progressText">1 von 9</strong>
+      </div>
+      <nav id="stepNavigation">
+        <button type="button" data-step="1"><b>1</b><span><strong>Auftrag</strong><small>Grunddaten</small></span><em></em></button>
+        <button type="button" data-step="2"><b>2</b><span><strong>Kunde</strong><small>Kontaktdaten</small></span><em></em></button>
+        <button type="button" data-step="3"><b>3</b><span><strong>Anlage</strong><small>Standort & Kennung</small></span><em></em></button>
+        <button type="button" data-step="4"><b>4</b><span><strong>Tor</strong><small>Hersteller & Modell</small></span><em></em></button>
+        <button type="button" data-step="5"><b>5</b><span><strong>Antrieb</strong><small>Steuerung & Sicherheit</small></span><em></em></button>
+        <button type="button" data-step="6"><b>6</b><span><strong>Arbeiten</strong><small>Prüfung & Mängel</small></span><em></em></button>
+        <button type="button" data-step="7"><b>7</b><span><strong>Nachweise</strong><small>Fotos, GPS, Signatur</small></span><em></em></button>
+        <button type="button" data-step="8"><b>8</b><span><strong>Prüfen</strong><small>Vollständigkeit</small></span><em></em></button>
+        <button type="button" data-step="9"><b>9</b><span><strong>Bericht</strong><small>PDF-Vorschau</small></span><em></em></button>
+      </nav>
+      <div class="rail-footer">
+        <button type="button" class="secondary-button full" id="newJob">+ Neuer Auftrag</button>
+        <small>Automatische lokale Speicherung</small>
+      </div>
+    </aside>
+
+    <main class="workspace" id="workspace">
+      <section class="step-panel" data-step-panel="1">
+        <div class="panel-heading">
+          <div><span class="eyebrow">Schritt 1</span><h1>Auftrag anlegen</h1><p>Die wichtigsten Angaben für den heutigen Einsatz.</p></div>
+          <span class="section-icon" aria-hidden="true">01</span>
+        </div>
+        <div class="form-card accent-card">
+          <div class="form-grid cols-3">
+            <label class="field"><span>Auftragsnummer <i>Pflicht</i></span><input data-bind="order.number" id="orderNumber" autocomplete="off" required></label>
+            <label class="field"><span>Datum <i>Pflicht</i></span><input data-bind="order.date" type="date" required></label>
+            <label class="field"><span>Techniker <i>Pflicht</i></span><input data-bind="order.technician" placeholder="Name des Technikers" autocomplete="name" required></label>
+            <label class="field"><span>Auftragsart <i>Pflicht</i></span><select data-bind="order.type" required><option value="">Bitte wählen</option><option>Wartung</option><option>UVV-Prüfung</option><option>Reparatur</option><option>Störung / Notdienst</option><option>Montage</option><option>Inbetriebnahme</option><option>Aufmaß</option><option>Beratung</option></select></label>
+            <label class="field"><span>Termin / Uhrzeit</span><input data-bind="order.appointment" type="time"></label>
+            <label class="field"><span>Priorität</span><select data-bind="order.priority"><option>Normal</option><option>Dringend</option><option>Notdienst</option></select></label>
+            <label class="field span-2"><span>Kundenreferenz / Bestellnummer</span><input data-bind="order.reference" placeholder="z. B. PO-4711 oder Ansprechpartner"></label>
+            <label class="field"><span>Vertrag</span><select data-bind="order.contract"><option value="">Kein Vertrag gewählt</option><option>Wartungsvertrag</option><option>Einzelauftrag</option><option>Gewährleistung</option></select></label>
+            <label class="field span-3"><span>Auftrag / gemeldete Störung</span><textarea data-bind="order.description" rows="4" placeholder="Was soll vor Ort gemacht oder geprüft werden?"></textarea></label>
+          </div>
+        </div>
+        <div class="quick-note"><strong>Schnellstart:</strong> Nur Pflichtfelder ausfüllen. Alle weiteren Angaben können direkt an der Anlage ergänzt werden.</div>
+      </section>
+
+      <section class="step-panel" data-step-panel="2" hidden>
+        <div class="panel-heading">
+          <div><span class="eyebrow">Schritt 2</span><h1>Kunde</h1><p>Betreiber, Ansprechpartner und Rechnungsanschrift.</p></div>
+          <span class="section-icon" aria-hidden="true">02</span>
+        </div>
+        <div class="form-card">
+          <div class="form-grid cols-2">
+            <label class="field span-2"><span>Firma / Betreiber <i>Pflicht</i></span><input data-bind="customer.company" autocomplete="organization" placeholder="Firmenname oder Privatkunde" required></label>
+            <label class="field"><span>Ansprechpartner</span><input data-bind="customer.contact" autocomplete="name"></label>
+            <label class="field"><span>Kundennummer</span><input data-bind="customer.number" inputmode="numeric"></label>
+            <label class="field span-2"><span>Straße und Hausnummer</span><input data-bind="customer.street" autocomplete="street-address"></label>
+            <label class="field"><span>PLZ</span><input data-bind="customer.zip" autocomplete="postal-code" inputmode="numeric"></label>
+            <label class="field"><span>Ort</span><input data-bind="customer.city" autocomplete="address-level2"></label>
+            <label class="field"><span>Telefon</span><input data-bind="customer.phone" type="tel" autocomplete="tel"></label>
+            <label class="field"><span>E-Mail</span><input data-bind="customer.email" type="email" autocomplete="email"></label>
+          </div>
+        </div>
+        <div class="form-card compact-card">
+          <label class="switch-row"><input data-bind="site.sameAsCustomer" id="sameAsCustomer" type="checkbox"><span></span><strong>Anlagenstandort entspricht der Kundenanschrift</strong></label>
+        </div>
+      </section>
+
+      <section class="step-panel" data-step-panel="3" hidden>
+        <div class="panel-heading">
+          <div><span class="eyebrow">Schritt 3</span><h1>Anlage und Standort</h1><p>Damit das Tor beim nächsten Einsatz sofort gefunden wird.</p></div>
+          <span class="section-icon" aria-hidden="true">03</span>
+        </div>
+        <div class="form-card">
+          <div class="form-grid cols-2">
+            <label class="field span-2"><span>Standort / Niederlassung <i>Pflicht</i></span><input data-bind="site.name" placeholder="z. B. Lagerhalle 2, Tor 7" required></label>
+            <label class="field span-2"><span>Straße und Hausnummer</span><input data-bind="site.street" autocomplete="street-address"></label>
+            <label class="field"><span>PLZ</span><input data-bind="site.zip" autocomplete="postal-code" inputmode="numeric"></label>
+            <label class="field"><span>Ort</span><input data-bind="site.city" autocomplete="address-level2"></label>
+            <label class="field"><span>Anlagen-Nr. des Kunden</span><input data-bind="site.assetNumber" placeholder="Interne Kennung"></label>
+            <label class="field"><span>Torposition</span><input data-bind="site.position" placeholder="z. B. Nordseite, Rampe 4"></label>
+            <label class="field"><span>Zugang / Schlüssel</span><input data-bind="site.access" placeholder="Hinweis für den Techniker"></label>
+            <label class="field"><span>Nutzung</span><select data-bind="site.usage"><option value="">Bitte wählen</option><option>Privatgarage</option><option>Werkstatt</option><option>Lager / Logistik</option><option>Produktion</option><option>Feuerwehr / Rettung</option><option>Sammelgarage</option><option>Verkaufsraum</option><option>Sonstige</option></select></label>
+            <label class="field span-2"><span>Standorthinweise</span><textarea data-bind="site.notes" rows="3" placeholder="Anfahrt, Meldepunkt, Sicherheitsunterweisung …"></textarea></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="step-panel" data-step-panel="4" hidden>
+        <div class="panel-heading">
+          <div><span class="eyebrow">Schritt 4</span><h1>Tor auswählen</h1><p>Modell schnell suchen oder frei erfassen.</p></div>
+          <span class="section-icon" aria-hidden="true">04</span>
+        </div>
+        <div class="catalog-status"><span class="catalog-dot"></span><strong>Hörmann-Katalog</strong><span id="catalogCount"></span><small>aktuelle und ältere Baureihen · erweiterbarer Datenbestand</small></div>
+        <div class="form-card">
+          <div class="form-grid cols-2">
+            <label class="field"><span>Hersteller <i>Pflicht</i></span><select data-bind="asset.manufacturer" id="manufacturer" required><option>Hörmann</option><option>Teckentrup</option><option>Novoferm</option><option>Alpha Deuren</option><option>Butzbach</option><option>Efaflex</option><option>Unbekannt</option><option>Anderer Hersteller</option></select></label>
+            <label class="field"><span>Torart <i>Pflicht</i></span><select data-bind="asset.category" id="doorCategory" required></select></label>
+            <label class="field span-2"><span>Modell / Baureihe <i>Pflicht</i></span><div class="select-with-meta"><select data-bind="asset.model" id="doorModel" required></select><span id="modelEra" class="era-badge" hidden></span></div></label>
+            <label class="field span-2 custom-model" hidden><span>Modell frei eingeben</span><input data-bind="asset.customModel" id="customDoorModel" placeholder="Bezeichnung vom Typenschild"></label>
+            <label class="field"><span>Baujahr</span><input data-bind="asset.year" type="number" min="1950" max="2100" inputmode="numeric" placeholder="JJJJ"></label>
+            <label class="field"><span>Fabrik- / Seriennummer</span><input data-bind="asset.serial" autocomplete="off"></label>
+            <label class="field"><span>Breite in mm</span><input data-bind="asset.width" type="number" min="0" inputmode="numeric"></label>
+            <label class="field"><span>Höhe in mm</span><input data-bind="asset.height" type="number" min="0" inputmode="numeric"></label>
+            <label class="field"><span>Beschlagsart</span><select data-bind="asset.track"><option value="">Nicht erfasst</option><option>N-Beschlag</option><option>L-Beschlag</option><option>H-Beschlag</option><option>V-Beschlag</option><option>Dachfolge</option><option>Sonderbeschlag</option><option>Nicht zutreffend</option></select></label>
+            <label class="field"><span>Torblatt / Oberfläche</span><input data-bind="asset.leaf" placeholder="z. B. 42 mm, S-Sicke, verglast"></label>
+          </div>
+          <div class="choice-row">
+            <label class="check-card"><input data-bind="asset.wicketDoor" type="checkbox"><span><strong>Schlupftür</strong><small>im Torblatt vorhanden</small></span></label>
+            <label class="check-card"><input data-bind="asset.manual" type="checkbox"><span><strong>Handbetätigt</strong><small>ohne elektrischen Antrieb</small></span></label>
+            <label class="check-card"><input data-bind="asset.externalDoor" type="checkbox"><span><strong>Außentor</strong><small>witterungsbeansprucht</small></span></label>
+          </div>
+        </div>
+        <aside class="info-card" id="modelInfo"><strong>Modellhinweis</strong><p>Nach Auswahl eines Hörmann-Modells werden passende Informationen angezeigt.</p></aside>
+      </section>
+
+      <section class="step-panel" data-step-panel="5" hidden>
+        <div class="panel-heading">
+          <div><span class="eyebrow">Schritt 5</span><h1>Antrieb und Steuerung</h1><p>Passend zur Torart auswählen oder frei erfassen.</p></div>
+          <span class="section-icon" aria-hidden="true">05</span>
+        </div>
+        <div class="form-card">
+          <div class="form-grid cols-2">
+            <label class="field"><span>Antrieb</span><select data-bind="drive.model" id="driveModel"></select></label>
+            <label class="field"><span>Steuerung</span><select data-bind="drive.control" id="driveControl"></select></label>
+            <label class="field custom-drive" hidden><span>Antrieb frei eingeben</span><input data-bind="drive.customModel" id="customDriveModel" placeholder="Bezeichnung vom Typenschild"></label>
+            <label class="field custom-control" hidden><span>Steuerung frei eingeben</span><input data-bind="drive.customControl" id="customControl" placeholder="Bezeichnung vom Typenschild"></label>
+            <label class="field"><span>Versorgung</span><select data-bind="drive.voltage"><option value="">Nicht erfasst</option><option>230 V</option><option>400 V</option><option>Akku / Solar</option><option>Andere</option></select></label>
+            <label class="field"><span>Betriebsart</span><select data-bind="drive.mode"><option value="">Nicht erfasst</option><option>Impuls / Selbsthaltung AUF und ZU</option><option>Selbsthaltung AUF, Totmann ZU</option><option>Totmann AUF und ZU</option><option>Automatikbetrieb</option><option>Handbetrieb</option></select></label>
+            <label class="field"><span>Antriebsnummer</span><input data-bind="drive.serial"></label>
+            <label class="field"><span>Funk / Frequenz</span><select data-bind="drive.radio"><option value="">Nicht erfasst</option><option>BiSecur 868 MHz</option><option>Festcode 868 MHz</option><option>Festcode 40,685 MHz</option><option>Bluetooth / BlueSecur</option><option>Kein Funk</option><option>Fremdfunk</option></select></label>
+          </div>
+        </div>
+        <div class="form-card">
+          <h2 class="card-title">Sicherheitsausstattung</h2>
+          <div class="toggle-grid">
+            <label class="toggle-item"><input data-array="drive.safety" value="Schließkantensicherung" type="checkbox"><span></span>Schließkantensicherung</label>
+            <label class="toggle-item"><input data-array="drive.safety" value="Lichtschranke" type="checkbox"><span></span>Lichtschranke</label>
+            <label class="toggle-item"><input data-array="drive.safety" value="Lichtgitter" type="checkbox"><span></span>Lichtgitter</label>
+            <label class="toggle-item"><input data-array="drive.safety" value="Schlupftürkontakt" type="checkbox"><span></span>Schlupftürkontakt</label>
+            <label class="toggle-item"><input data-array="drive.safety" value="Seilbruchsicherung" type="checkbox"><span></span>Seilbruchsicherung</label>
+            <label class="toggle-item"><input data-array="drive.safety" value="Federbruchsicherung" type="checkbox"><span></span>Federbruchsicherung</label>
+            <label class="toggle-item"><input data-array="drive.safety" value="Abrollsicherung" type="checkbox"><span></span>Abrollsicherung / Fangvorrichtung</label>
+            <label class="toggle-item"><input data-array="drive.safety" value="Not-Aus" type="checkbox"><span></span>Not-Aus</label>
+            <label class="toggle-item"><input data-array="drive.safety" value="Hauptschalter" type="checkbox"><span></span>Verriegelbarer Hauptschalter</label>
+            <label class="toggle-item"><input data-array="drive.safety" value="Radar/Induktion" type="checkbox"><span></span>Radar / Induktionsschleife</label>
+          </div>
+        </div>
+      </section>
+
+      <section class="step-panel wide-panel" data-step-panel="6" hidden>
+        <div class="panel-heading">
+          <div><span class="eyebrow">Schritt 6</span><h1>Arbeiten und Prüfung</h1><p>Einmal tippen statt lange schreiben. Auffälligkeiten bleiben sichtbar.</p></div>
+          <span class="section-icon" aria-hidden="true">06</span>
+        </div>
+        <div class="form-card">
+          <h2 class="card-title">Ausgeführte Arbeiten</h2>
+          <div class="chip-grid">
+            <label><input data-array="work.activities" value="Sichtprüfung" type="checkbox"><span>Sichtprüfung</span></label>
+            <label><input data-array="work.activities" value="Funktionsprüfung" type="checkbox"><span>Funktionsprüfung</span></label>
+            <label><input data-array="work.activities" value="Wartung" type="checkbox"><span>Wartung</span></label>
+            <label><input data-array="work.activities" value="Reinigung" type="checkbox"><span>Reinigung</span></label>
+            <label><input data-array="work.activities" value="Schmierung" type="checkbox"><span>Schmierung</span></label>
+            <label><input data-array="work.activities" value="Einstellung" type="checkbox"><span>Einstellung</span></label>
+            <label><input data-array="work.activities" value="Kraftmessung" type="checkbox"><span>Kraftmessung</span></label>
+            <label><input data-array="work.activities" value="Reparatur" type="checkbox"><span>Reparatur</span></label>
+            <label><input data-array="work.activities" value="Teiletausch" type="checkbox"><span>Teiletausch</span></label>
+            <label><input data-array="work.activities" value="Einweisung" type="checkbox"><span>Einweisung</span></label>
+          </div>
+          <label class="field top-gap"><span>Arbeitsbeschreibung</span><textarea data-bind="work.description" rows="3" placeholder="Was wurde konkret durchgeführt?"></textarea></label>
+        </div>
+
+        <div class="checklist-card">
+          <div class="checklist-head">
+            <div><span class="eyebrow">Dynamische Prüfliste</span><h2 id="checklistTitle">Prüfpunkte</h2><p id="checklistHint">Die Liste richtet sich automatisch nach der gewählten Torart.</p></div>
+            <div class="checklist-actions"><button type="button" class="secondary-button" id="markAllOk">Alle o. B.</button><button type="button" class="ghost-button" id="clearChecklist">Leeren</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="checklist-table">
+              <thead><tr><th>Prüfpunkt</th><th>Status</th><th>Bemerkung / Maßnahme</th></tr></thead>
+              <tbody id="checklistRows"></tbody>
+            </table>
+          </div>
+          <div class="checklist-legend"><span><i class="ok"></i> ohne Beanstandung</span><span><i class="maintenance"></i> Wartung erforderlich</span><span><i class="repair"></i> Reparatur / Mangel</span><span><i class="na"></i> nicht zutreffend</span></div>
+        </div>
+
+        <div class="form-card">
+          <div class="form-grid cols-2">
+            <label class="field"><span>Kraftmessung / Messwerte</span><textarea data-bind="work.measurements" rows="4" placeholder="Messpunkt, Öffnungsweite, Messwert …"></textarea></label>
+            <label class="field"><span>Eingebaute / benötigte Ersatzteile</span><textarea data-bind="work.parts" rows="4" placeholder="Artikel, Menge, Status …"></textarea></label>
+            <label class="field"><span>Festgestellte Mängel</span><textarea data-bind="work.defects" rows="4" placeholder="Alle Mängel und Gefährdungen zusammenfassen"></textarea></label>
+            <label class="field"><span>Empfehlung / weitere Arbeiten</span><textarea data-bind="work.recommendation" rows="4" placeholder="Folgeauftrag, Angebot, Stilllegung …"></textarea></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="step-panel" data-step-panel="7" hidden>
+        <div class="panel-heading">
+          <div><span class="eyebrow">Schritt 7</span><h1>Nachweise</h1><p>Standort, Fotos und Unterschriften direkt vor Ort erfassen.</p></div>
+          <span class="section-icon" aria-hidden="true">07</span>
+        </div>
+        <div class="evidence-grid">
+          <div class="form-card evidence-card">
+            <div class="card-title-row"><h2 class="card-title">GPS-Standort</h2><button type="button" class="secondary-button" id="captureGps">Standort erfassen</button></div>
+            <div class="gps-box" id="gpsBox"><span class="gps-pin">⌖</span><div><strong>Noch kein Standort gespeichert</strong><small>Koordinaten und Zeitpunkt werden im Bericht dokumentiert.</small></div></div>
+          </div>
+          <div class="form-card evidence-card">
+            <div class="card-title-row"><h2 class="card-title">Fotos</h2><label class="primary-button file-button">+ Foto aufnehmen<input id="photoInput" type="file" accept="image/*" capture="environment" multiple></label></div>
+            <p class="field-help">Übersicht, Typenschild, Mangel und Abschlusszustand fotografieren.</p>
+            <div class="photo-grid" id="photoGrid"><div class="empty-photos"><strong>Noch keine Fotos</strong><small>Bis zu 12 komprimierte Bilder je Auftrag</small></div></div>
+          </div>
+        </div>
+        <div class="signature-grid">
+          <div class="form-card signature-card">
+            <div class="card-title-row"><h2 class="card-title">Techniker</h2><button type="button" class="ghost-button clear-signature" data-signature="technician">Löschen</button></div>
+            <canvas id="signatureTechnician" data-signature-canvas="technician"></canvas>
+            <small>Mit Finger, Stift oder Maus unterschreiben</small>
+          </div>
+          <div class="form-card signature-card">
+            <div class="card-title-row"><h2 class="card-title">Kunde / Betreiber</h2><button type="button" class="ghost-button clear-signature" data-signature="customer">Löschen</button></div>
+            <canvas id="signatureCustomer" data-signature-canvas="customer"></canvas>
+            <small>Bestätigung der ausgeführten Arbeiten</small>
+          </div>
+        </div>
+        <label class="field form-card"><span>Name des Unterzeichners beim Kunden</span><input data-bind="report.customerSigner" placeholder="Vor- und Nachname"></label>
+      </section>
+
+      <section class="step-panel" data-step-panel="8" hidden>
+        <div class="panel-heading">
+          <div><span class="eyebrow">Schritt 8</span><h1>Bericht prüfen</h1><p>Fehlende Pflichtangaben und offene Prüfpunkte auf einen Blick.</p></div>
+          <span class="section-icon" aria-hidden="true">08</span>
+        </div>
+        <div id="validationSummary" class="validation-summary"></div>
+        <div class="review-grid" id="reviewGrid"></div>
+        <div class="form-card">
+          <h2 class="card-title">Ergebnis festlegen</h2>
+          <div class="result-options">
+            <label class="result-ok"><input data-bind="report.result" type="radio" value="Anlage ohne Beanstandung"><span><b>✓</b><strong>Ohne Beanstandung</strong><small>Anlage kann weiter betrieben werden</small></span></label>
+            <label class="result-warning"><input data-bind="report.result" type="radio" value="Anlage mit Beanstandungen"><span><b>!</b><strong>Mit Beanstandungen</strong><small>Mängel dokumentiert, Maßnahmen erforderlich</small></span></label>
+            <label class="result-danger"><input data-bind="report.result" type="radio" value="Anlage außer Betrieb"><span><b>×</b><strong>Außer Betrieb</strong><small>Sicherer Betrieb derzeit nicht möglich</small></span></label>
+          </div>
+          <div class="form-grid cols-2 top-gap">
+            <label class="field"><span>Nächster Prüftermin</span><input data-bind="report.nextInspection" type="date"></label>
+            <label class="field"><span>Arbeitszeit gesamt</span><div class="input-unit"><input data-bind="work.hours" type="number" min="0" step="0.25" inputmode="decimal"><span>Std.</span></div></label>
+            <label class="field span-2"><span>Abschließender Hinweis an den Kunden</span><textarea data-bind="report.note" rows="3"></textarea></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="step-panel report-step" data-step-panel="9" hidden>
+        <div class="panel-heading no-print">
+          <div><span class="eyebrow">Schritt 9</span><h1>Bericht und PDF</h1><p>Vorschau prüfen, dann drucken oder als PDF speichern.</p></div>
+          <div class="report-actions"><button type="button" class="secondary-button" id="backToEdit">Bearbeiten</button><button type="button" class="primary-button" id="printReport">Drucken / PDF</button><button type="button" class="success-button" id="finishJob">Auftrag abschließen</button></div>
+        </div>
+        <div id="reportPreview" class="report-preview"></div>
+      </section>
+
+      <footer class="workspace-footer no-print">
+        <button type="button" class="secondary-button" id="prevStep">← Zurück</button>
+        <div class="mobile-progress"><span id="mobileProgressLabel">Schritt 1 von 9</span><i><b id="mobileProgressBar"></b></i></div>
+        <button type="button" class="primary-button" id="nextStep">Weiter →</button>
+      </footer>
+    </main>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="jobs-drawer" id="jobsDrawer" aria-label="Gespeicherte Aufträge" aria-hidden="true">
+    <div class="drawer-head"><div><span class="eyebrow">Lokale Ablage</span><h2>Aufträge</h2></div><button type="button" class="close-button" id="closeJobs" aria-label="Schließen">×</button></div>
+    <div class="drawer-tools"><input id="jobSearch" type="search" placeholder="Auftrag, Kunde oder Ort suchen"><button type="button" class="primary-button" id="newJobDrawer">+ Neu</button></div>
+    <div class="job-list" id="jobList"></div>
+  </aside>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/catalog.js"></script>
+  <script src="js/checklists.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
