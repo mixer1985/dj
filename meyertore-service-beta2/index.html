@@ -42,6 +42,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg>
         <span>Installieren</span>
       </button>
+      <button class="icon-button open-workflow-settings" type="button" title="Arbeitsablauf anpassen" aria-label="Arbeitsablauf anpassen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h2m4 0h10M4 18h7m4 0h5M14 4v4M8 10v4m5 2v4"/></svg>
+        <span>Ablauf</span>
+      </button>
     </div>
   </header>
 
@@ -63,6 +67,7 @@
         <button type="button" data-step="9"><b>9</b><span><strong>Bericht</strong><small>PDF-Vorschau</small></span><em></em></button>
       </nav>
       <div class="rail-footer">
+        <button type="button" class="secondary-button full open-workflow-settings">Ablauf anpassen</button>
         <button type="button" class="secondary-button full" id="newJob">+ Neuer Auftrag</button>
         <small>Automatische lokale Speicherung</small>
       </div>
@@ -89,18 +94,22 @@
         </div>
         <div class="form-card deployment-card">
           <div class="deployment-heading">
-            <div><span class="eyebrow">Einsatzdaten</span><h2 class="card-title">Monteure, Baustellenzeit und Fahrt</h2><p>Abfahrt bei Meyer Tore erfassen, an der Baustelle ankommen und die Strecke automatisch übernehmen.</p></div>
-            <div class="crew-choice" role="group" aria-label="Anzahl der Monteure">
-              <label><input data-bind="deployment.crewSize" type="radio" value="1"><span><b>1</b> Mann</span></label>
-              <label><input data-bind="deployment.crewSize" type="radio" value="2"><span><b>2</b> Mann</span></label>
+            <div><span class="eyebrow">Einsatzdaten</span><h2 class="card-title">Technikerbesetzung, Baustellenzeit und Fahrt</h2><p>Startpunkt festlegen, an der Baustelle ankommen und Strecke sowie Einsatzzeit automatisch übernehmen.</p></div>
+            <div class="crew-choice" role="group" aria-label="Technikerbesetzung">
+              <label><input data-bind="deployment.crewSize" name="deploymentCrew" type="radio" value="1"><span><b>1</b> Einzelbesetzung</span></label>
+              <label><input data-bind="deployment.crewSize" name="deploymentCrew" type="radio" value="2"><span><b>2</b> Zweierteam</span></label>
             </div>
           </div>
           <label class="field second-technician" id="secondTechnicianField" hidden><span>Zweiter Monteur</span><input data-bind="deployment.secondTechnician" placeholder="Name des zweiten Monteurs" autocomplete="name"></label>
           <div class="deployment-grid">
             <section class="deployment-panel route-panel">
-              <header><span class="deployment-icon">↗</span><div><h3>Fahrt zur Baustelle</h3><p>Zwei GPS-Punkte genügen für die automatische Straßenstrecke.</p></div></header>
+              <header><span class="deployment-icon">↗</span><div><h3>Fahrt zur Baustelle</h3><p>Start- und Zielpunkt werden für die automatische Straßenstrecke verwendet.</p></div></header>
+              <div class="origin-choice" role="group" aria-label="Startpunkt der Fahrt">
+                <label><input data-bind="deployment.originType" name="deploymentOrigin" type="radio" value="company"><span><b>Firma</b><small>Am Stall 11, 42369 Wuppertal</small></span></label>
+                <label><input data-bind="deployment.originType" name="deploymentOrigin" type="radio" value="customer"><span><b>Kunde</b><small>aktuellen Standort per GPS abrufen</small></span></label>
+              </div>
               <div class="deployment-actions">
-                <button class="primary-button" id="captureTripStart" type="button">Abfahrt Firma erfassen</button>
+                <button class="primary-button" id="captureTripStart" type="button">Fahrt starten</button>
                 <button class="secondary-button" id="captureTripEnd" type="button">Ankunft Baustelle</button>
               </div>
               <div class="route-timeline">
@@ -350,6 +359,23 @@
   </div>
 
   <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <dialog class="workflow-dialog" id="workflowDialog" aria-labelledby="workflowDialogTitle">
+    <form method="dialog">
+      <header class="workflow-dialog-head"><div><span class="eyebrow">Auftrag verkürzen</span><h2 id="workflowDialogTitle">Arbeitsablauf anpassen</h2><p>Nicht benötigte Schritte werden übersprungen. Bereits erfasste Daten bleiben erhalten.</p></div><button class="close-button" value="cancel" aria-label="Schließen">×</button></header>
+      <div class="workflow-fixed"><span>1</span><div><strong>Auftrag</strong><small>Startpunkt des Arbeitsablaufs</small></div><b>fest</b></div>
+      <div class="workflow-step-list">
+        <label><input data-workflow-step="2" type="checkbox"><span>2</span><div><strong>Kunde</strong><small>Kontaktdaten</small></div><i></i></label>
+        <label><input data-workflow-step="3" type="checkbox"><span>3</span><div><strong>Anlage</strong><small>Standort und Kennung</small></div><i></i></label>
+        <label><input data-workflow-step="4" type="checkbox"><span>4</span><div><strong>Tor</strong><small>Hersteller und Modell</small></div><i></i></label>
+        <label><input data-workflow-step="5" type="checkbox"><span>5</span><div><strong>Antrieb</strong><small>Steuerung und Sicherheit</small></div><i></i></label>
+        <label><input data-workflow-step="6" type="checkbox"><span>6</span><div><strong>Arbeiten</strong><small>Prüfung und Mängel</small></div><i></i></label>
+        <label><input data-workflow-step="7" type="checkbox"><span>7</span><div><strong>Nachweise</strong><small>Fotos, GPS und Signatur</small></div><i></i></label>
+        <label><input data-workflow-step="8" type="checkbox"><span>8</span><div><strong>Prüfen</strong><small>Vollständigkeitskontrolle</small></div><i></i></label>
+      </div>
+      <div class="workflow-fixed"><span>9</span><div><strong>Bericht</strong><small>Vorschau und Abschluss</small></div><b>fest</b></div>
+      <footer class="workflow-dialog-actions"><button type="button" class="ghost-button" id="enableAllSteps">Alle aktivieren</button><button class="secondary-button" value="cancel">Abbrechen</button><button type="button" class="primary-button" id="saveWorkflowSettings">Übernehmen</button></footer>
+    </form>
+  </dialog>
   <aside class="jobs-drawer" id="jobsDrawer" aria-label="Gespeicherte Aufträge" aria-hidden="true">
     <div class="drawer-head"><div><span class="eyebrow">Lokale Ablage</span><h2>Aufträge</h2></div><button type="button" class="close-button" id="closeJobs" aria-label="Schließen">×</button></div>
     <div class="drawer-tools"><input id="jobSearch" type="search" placeholder="Auftrag, Kunde oder Ort suchen"><button type="button" class="primary-button" id="newJobDrawer">+ Neu</button></div>
