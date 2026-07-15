@@ -3,6 +3,7 @@
 
   const catalog = window.MEYER_CATALOG;
   const checklistLibrary = window.MEYER_CHECKLISTS;
+  const travel = window.MEYER_TRAVEL;
   const JOBS_KEY = "meyer-tore-beta2-jobs";
   const CURRENT_KEY = "meyer-tore-beta2-current";
   const MAX_PHOTOS = 12;
@@ -13,6 +14,7 @@
   let saveTimer = null;
   let toastTimer = null;
   let installPrompt = null;
+  let workClockTimer = null;
   let job = loadInitialJob();
   const signatureCanvases = {};
 
@@ -41,7 +43,7 @@
     const now = new Date().toISOString();
     return {
       schema: "meyer-tore-job",
-      schemaVersion: 2,
+      schemaVersion: 3,
       id: uid(),
       status: "draft",
       createdAt: now,
@@ -51,6 +53,11 @@
       order: {
         number: makeOrderNumber(), date: localDate(), technician: "", type: "", appointment: "",
         priority: "Normal", reference: "", contract: "", description: ""
+      },
+      deployment: {
+        crewSize: "1", secondTechnician: "", tripStart: null, tripEnd: null,
+        distanceKm: "", distanceMethod: "", workStartedAt: "", workEndedAt: "",
+        workMinutes: 0, personHours: 0
       },
       customer: { company: "", contact: "", number: "", street: "", zip: "", city: "", phone: "", email: "" },
       site: { sameAsCustomer: false, name: "", street: "", zip: "", city: "", assetNumber: "", position: "", access: "", usage: "", notes: "" },
@@ -81,7 +88,8 @@
   function normalizeJob(value) {
     const normalized = mergeDefaults(value || {}, newJob());
     normalized.schema = "meyer-tore-job";
-    normalized.schemaVersion = 2;
+    normalized.schemaVersion = 3;
+    normalized.deployment.crewSize = normalized.deployment.crewSize === "2" ? "2" : "1";
     normalized.evidence.photos = Array.isArray(normalized.evidence.photos) ? normalized.evidence.photos.slice(0, MAX_PHOTOS) : [];
     normalized.drive.safety = Array.isArray(normalized.drive.safety) ? normalized.drive.safety : [];
     normalized.work.activities = Array.isArray(normalized.work.activities) ? normalized.work.activities : [];
@@ -230,6 +238,188 @@
     });
   }
 
+  function gpsErrorMessage(error) {
+    if (error?.code === 1) return "Standortfreigabe wurde nicht erteilt.";
+    if (error?.code === 3) return "GPS-Abfrage hat zu lange gedauert. Bitte erneut versuchen.";
+    return "Standort konnte nicht ermittelt werden.";
+  }
+
+  function currentGpsPoint() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Standorterfassung wird auf diesem Gerät nicht unterstützt."));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition((position) => {
+        resolve({
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          capturedAt: new Date(position.timestamp || Date.now()).toISOString()
+        });
+      }, reject, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    });
+  }
+
+  function coordinateSummary(point) {
+    return `${point.lat.toFixed(6)}, ${point.lon.toFixed(6)} · ± ${Math.round(point.accuracy || 0)} m · ${formatDate(point.capturedAt, true)}`;
+  }
+
+  function deploymentWorkMinutes() {
+    if (!job.deployment.workStartedAt) return 0;
+    return travel.durationMinutes(job.deployment.workStartedAt, job.deployment.workEndedAt || Date.now());
+  }
+
+  function updateCalculatedWorkTime() {
+    const minutes = deploymentWorkMinutes();
+    const hours = travel.personHours(minutes, job.deployment.crewSize);
+    job.deployment.workMinutes = minutes;
+    job.deployment.personHours = hours;
+    job.work.hours = hours ? String(hours) : "";
+  }
+
+  function renderDeployment(manageTimer = true) {
+    if (!$("#captureTripStart")) return;
+    const deployment = job.deployment;
+    const crewSize = deployment.crewSize === "2" ? 2 : 1;
+    const secondTechnician = $("#secondTechnicianField");
+    secondTechnician.hidden = crewSize !== 2;
+
+    const startSummary = $("#tripStartSummary");
+    if (deployment.tripStart) {
+      startSummary.className = "route-point captured";
+      startSummary.innerHTML = `<i></i><div><strong>Firma · Am Stall 11</strong><small>${escapeHtml(coordinateSummary(deployment.tripStart))}</small></div>`;
+    } else {
+      startSummary.className = "route-point";
+      startSummary.innerHTML = `<i></i><div><strong>Firma · Am Stall 11</strong><small>Abfahrt noch nicht erfasst</small></div>`;
+    }
+
+    const endSummary = $("#tripEndSummary");
+    if (deployment.tripEnd) {
+      endSummary.className = "route-point captured";
+      endSummary.innerHTML = `<i></i><div><strong>Baustelle${job.site.name ? ` · ${escapeHtml(job.site.name)}` : ""}</strong><small>${escapeHtml(coordinateSummary(deployment.tripEnd))}</small></div>`;
+    } else {
+      endSummary.className = "route-point";
+      endSummary.innerHTML = `<i></i><div><strong>Baustelle</strong><small>Ankunft noch nicht erfasst</small></div>`;
+    }
+
+    const distanceInput = $("#tripDistance");
+    if (document.activeElement !== distanceInput) distanceInput.value = deployment.distanceKm ?? "";
+    $("#tripDistanceMethod").textContent = deployment.distanceMethod || "Wird nach der Ankunft automatisch berechnet";
+    const tripMinutes = deployment.tripStart && deployment.tripEnd ? travel.durationMinutes(deployment.tripStart.capturedAt, deployment.tripEnd.capturedAt) : 0;
+    $("#tripDurationValue").textContent = tripMinutes ? travel.formatDuration(tripMinutes) : "—";
+    $("#captureTripStart").textContent = deployment.tripStart ? "Abfahrt neu erfassen" : "Abfahrt Firma erfassen";
+    $("#captureTripEnd").disabled = !deployment.tripStart;
+
+    const active = Boolean(deployment.workStartedAt && !deployment.workEndedAt);
+    const minutes = deploymentWorkMinutes();
+    const hours = travel.personHours(minutes, crewSize);
+    const clock = $("#workClock");
+    if (active) {
+      clock.className = "work-clock active";
+      clock.innerHTML = `<span>◷</span><div><strong>Läuft seit ${escapeHtml(formatDate(deployment.workStartedAt, true))}</strong><small>Aktuell ${escapeHtml(travel.formatDuration(minutes))} Baustellenzeit</small></div>`;
+    } else if (deployment.workStartedAt && deployment.workEndedAt) {
+      clock.className = "work-clock";
+      clock.innerHTML = `<span>✓</span><div><strong>Arbeitszeit beendet</strong><small>${escapeHtml(formatDate(deployment.workStartedAt, true))} bis ${escapeHtml(formatDate(deployment.workEndedAt, true))}</small></div>`;
+    } else {
+      clock.className = "work-clock";
+      clock.innerHTML = `<span>◷</span><div><strong>Noch nicht gestartet</strong><small>Baustellenzeit wird minutengenau gespeichert</small></div>`;
+    }
+    $("#workDurationValue").textContent = deployment.workStartedAt ? travel.formatDuration(minutes) : "—";
+    $("#personHoursValue").textContent = deployment.workStartedAt ? `${hours.toLocaleString("de-DE", { maximumFractionDigits: 2 })} Std.` : "—";
+    $("#personHoursHint").textContent = `${crewSize} ${crewSize === 1 ? "Monteur" : "Monteure"} × Arbeitszeit`;
+    $("#startWorkTime").disabled = active;
+    $("#startWorkTime").textContent = deployment.workEndedAt ? "Arbeitszeit neu starten" : "Arbeitszeit starten";
+    $("#finishWorkTime").disabled = !active;
+
+    if (manageTimer) {
+      clearInterval(workClockTimer);
+      workClockTimer = active ? setInterval(() => renderDeployment(false), 30000) : null;
+    }
+  }
+
+  async function captureTripStart() {
+    if (job.deployment.tripStart && !confirm("Vorhandene Abfahrt und Strecke neu erfassen?")) return;
+    const button = $("#captureTripStart");
+    button.disabled = true;
+    button.textContent = "GPS wird ermittelt …";
+    try {
+      job.deployment.tripStart = await currentGpsPoint();
+      job.deployment.tripEnd = null;
+      job.deployment.distanceKm = "";
+      job.deployment.distanceMethod = "";
+      scheduleSave();
+      showToast("Abfahrt bei Meyer Tore wurde gespeichert.");
+    } catch (error) {
+      showToast(gpsErrorMessage(error), true);
+    } finally {
+      button.disabled = false;
+      renderDeployment();
+    }
+  }
+
+  async function captureTripEnd() {
+    if (!job.deployment.tripStart) {
+      showToast("Bitte zuerst die Abfahrt bei der Firma erfassen.", true);
+      return;
+    }
+    const button = $("#captureTripEnd");
+    button.disabled = true;
+    button.textContent = "GPS wird ermittelt …";
+    try {
+      const destination = await currentGpsPoint();
+      job.deployment.tripEnd = destination;
+      job.evidence.gps = structuredClone(destination);
+      if (!job.deployment.workStartedAt) job.deployment.workStartedAt = destination.capturedAt;
+      renderGps();
+      renderDeployment();
+      scheduleSave();
+
+      button.textContent = "Straßenstrecke wird berechnet …";
+      try {
+        const kilometers = await travel.roadDistanceKm(job.deployment.tripStart, destination);
+        job.deployment.distanceKm = kilometers.toFixed(1);
+        job.deployment.distanceMethod = "Straßenroute automatisch berechnet";
+        showToast(`${kilometers.toLocaleString("de-DE", { minimumFractionDigits: 1 })} km bis zur Baustelle eingetragen.`);
+      } catch (_) {
+        const kilometers = Math.round(travel.haversineKm(job.deployment.tripStart, destination) * 10) / 10;
+        job.deployment.distanceKm = kilometers.toFixed(1);
+        job.deployment.distanceMethod = "Luftlinie – Straßenroute bitte prüfen";
+        showToast("Routendienst nicht erreichbar. Luftlinie wurde als Prüfwert eingetragen.", true, 5500);
+      }
+      scheduleSave();
+    } catch (error) {
+      showToast(gpsErrorMessage(error), true);
+    } finally {
+      button.disabled = false;
+      renderDeployment();
+    }
+  }
+
+  function startWorkTime() {
+    if (job.deployment.workEndedAt && !confirm("Vorhandene Baustellenzeit verwerfen und neu starten?")) return;
+    job.deployment.workStartedAt = new Date().toISOString();
+    job.deployment.workEndedAt = "";
+    job.deployment.workMinutes = 0;
+    job.deployment.personHours = 0;
+    job.work.hours = "";
+    renderDeployment();
+    scheduleSave();
+    showToast("Arbeitszeit auf der Baustelle läuft.");
+  }
+
+  function finishWorkTime() {
+    if (!job.deployment.workStartedAt || job.deployment.workEndedAt) {
+      showToast("Die Arbeitszeit wurde noch nicht gestartet.", true);
+      return;
+    }
+    job.deployment.workEndedAt = new Date().toISOString();
+    updateCalculatedWorkTime();
+    renderDeployment();
+    scheduleSave();
+    showToast(`${travel.formatDuration(job.deployment.workMinutes)} Baustellenzeit gespeichert.`);
+  }
+
   function updateHeader() {
     $("#headerOrderNumber").textContent = job.order.number || "Neuer Auftrag";
   }
@@ -264,6 +454,11 @@
     if (path === "asset.category" || path === "asset.manufacturer") updateCatalogSelectors(path === "asset.category");
     if (path === "asset.model") updateModelDetails();
     if (path === "drive.model" || path === "drive.control") updateCustomDriveFields();
+    if (path === "deployment.distanceKm") job.deployment.distanceMethod = "Manuell eingetragen";
+    if (path === "deployment.crewSize") {
+      if (job.deployment.workEndedAt) updateCalculatedWorkTime();
+      renderDeployment();
+    }
     scheduleSave();
     updateStepStates();
   }
@@ -469,6 +664,7 @@
     $("#nextStep").textContent = next === 8 ? "Bericht erstellen →" : "Weiter →";
     $(".workspace-footer").style.display = next === 9 ? "none" : "flex";
     updateStepStates();
+    if (next === 1) renderDeployment();
     if (next === 6) renderChecklist();
     if (next === 7) {
       renderGps();
@@ -502,6 +698,10 @@
 
   function renderReview() {
     const stats = checklistStats();
+    const crewSize = job.deployment.crewSize === "2" ? 2 : 1;
+    const workMinutes = deploymentWorkMinutes();
+    const tripMinutes = job.deployment.tripStart && job.deployment.tripEnd ? travel.durationMinutes(job.deployment.tripStart.capturedAt, job.deployment.tripEnd.capturedAt) : 0;
+    const crewText = crewSize === 2 ? `2 Monteure · ${[job.order.technician, job.deployment.secondTechnician].filter(Boolean).join(" / ")}` : `1 Monteur · ${job.order.technician || "nicht benannt"}`;
     if (!job.report.result) {
       if (stats.repair > 0 || stats.maintenance > 0) job.report.result = "Anlage mit Beanstandungen";
       else if (stats.checked === stats.total && stats.total > 0) job.report.result = "Anlage ohne Beanstandung";
@@ -519,6 +719,7 @@
 
     const cards = [
       { title: "Auftrag", step: 1, rows: [["Nummer", job.order.number], ["Art", job.order.type], ["Techniker", job.order.technician], ["Datum", formatDate(job.order.date)]] },
+      { title: "Einsatz & Fahrt", step: 1, rows: [["Besetzung", crewText], ["Strecke", job.deployment.distanceKm ? `${job.deployment.distanceKm} km` : "—"], ["Fahrzeit", tripMinutes ? travel.formatDuration(tripMinutes) : "—"], ["Baustellenzeit", job.deployment.workStartedAt ? travel.formatDuration(workMinutes) : "—"]] },
       { title: "Kunde & Standort", step: 2, rows: [["Betreiber", job.customer.company], ["Kontakt", job.customer.contact], ["Standort", job.site.name], ["Ort", [job.site.zip, job.site.city].filter(Boolean).join(" ")]] },
       { title: "Toranlage", step: 4, rows: [["Torart", categoryLabel(job.asset.category)], ["Modell", modelLabel()], ["Baujahr", job.asset.year], ["Fabrik-Nr.", job.asset.serial]] },
       { title: "Antrieb & Prüfung", step: 5, rows: [["Antrieb", driveLabel()], ["Steuerung", controlLabel()], ["Geprüft", `${stats.checked} / ${stats.total}`], ["Mängel", `${stats.repair} Reparatur · ${stats.maintenance} Wartung`]] }
@@ -699,7 +900,7 @@
   }
 
   function reportHeader(pageTitle) {
-    return `<header class="report-header"><div class="report-brand"><span class="report-logo"><i></i><i></i><i></i></span><span><strong>MEYER TORE</strong><small>Service · Wartung · Prüfung · Reparatur</small></span></div><div class="report-company">Meyer Tore<br>Am Stall 11 · 42369 Wuppertal<br>Tel. 0202 / 317 29 23</div></header><div class="report-titlebar"><div><small>Digitaler Servicebericht</small><h1>${escapeHtml(pageTitle)}</h1></div><span class="report-status ${reportStatusClass()}">${escapeHtml(job.status === "completed" ? "ABGESCHLOSSEN" : "ENTWURF")}</span></div>`;
+    return `<header class="report-header"><div class="report-brand"><img src="assets/meyertore-logo.png" alt=".meyertore – Vertrieb, Montage, Service"></div><div class="report-company">meyertore<br>Am Stall 11 · 42369 Wuppertal<br>Tel. 0202 / 317 29 22 · info@meyertore.de</div></header><div class="report-titlebar"><div><small>Digitaler Servicebericht</small><h1>${escapeHtml(pageTitle)}</h1></div><span class="report-status ${reportStatusClass()}">${escapeHtml(job.status === "completed" ? "ABGESCHLOSSEN" : "ENTWURF")}</span></div>`;
   }
 
   function reportStatusClass() {
@@ -725,14 +926,20 @@
     const size = job.asset.width || job.asset.height ? `${display(job.asset.width, "?")} × ${display(job.asset.height, "?")} mm` : "—";
     const safety = job.drive.safety.length ? job.drive.safety.join(", ") : "Nicht erfasst";
     const activities = job.work.activities.length ? job.work.activities.join(", ") : "Nicht erfasst";
+    const crewSize = job.deployment.crewSize === "2" ? 2 : 1;
+    const workMinutes = deploymentWorkMinutes();
+    const tripMinutes = job.deployment.tripStart && job.deployment.tripEnd ? travel.durationMinutes(job.deployment.tripStart.capturedAt, job.deployment.tripEnd.capturedAt) : 0;
+    const personHours = Number(job.work.hours) || (job.deployment.workStartedAt ? travel.personHours(workMinutes, crewSize) : 0);
+    const crewText = crewSize === 2 ? `2 Monteure · ${[job.order.technician, job.deployment.secondTechnician].filter(Boolean).join(" / ")}` : `1 Monteur · ${job.order.technician || "nicht benannt"}`;
+    const distanceText = job.deployment.distanceKm ? `${job.deployment.distanceKm} km${job.deployment.distanceMethod ? ` · ${job.deployment.distanceMethod}` : ""}` : "—";
     const issueRecords = template.items.filter((entry) => ["maintenance", "repair"].includes(job.work.checklist[entry.id]?.status));
     const statusLabels = Object.fromEntries(checklistLibrary.statuses.map((entry) => [entry.id, entry.label]));
 
     const page1 = `<article class="report-page">${reportHeader("Service- und Prüfbericht")}
-      <section class="report-section"><h2>Auftrag</h2><div class="report-data three">${reportPair("Auftragsnummer", job.order.number)}${reportPair("Datum / Termin", `${formatDate(job.order.date)}${job.order.appointment ? ` · ${job.order.appointment} Uhr` : ""}`)}${reportPair("Auftragsart", job.order.type)}${reportPair("Techniker", job.order.technician)}${reportPair("Kundenreferenz", job.order.reference)}${reportPair("Vertrag", job.order.contract)}</div></section>
+      <section class="report-section"><h2>Auftrag</h2><div class="report-data three">${reportPair("Auftragsnummer", job.order.number)}${reportPair("Datum / Termin", `${formatDate(job.order.date)}${job.order.appointment ? ` · ${job.order.appointment} Uhr` : ""}`)}${reportPair("Auftragsart", job.order.type)}${reportPair("Techniker", job.order.technician)}${reportPair("Besetzung", crewText)}${reportPair("Kundenreferenz", job.order.reference)}${reportPair("Vertrag", job.order.contract)}</div></section>
       <section class="report-section"><h2>Kunde und Anlagenstandort</h2><div class="report-data">${reportPair("Betreiber", job.customer.company)}${reportPair("Ansprechpartner", job.customer.contact)}${reportPair("Kundenanschrift", [job.customer.street, [job.customer.zip, job.customer.city].filter(Boolean).join(" ")].filter(Boolean).join(", "))}${reportPair("Telefon / E-Mail", [job.customer.phone, job.customer.email].filter(Boolean).join(" · "))}${reportPair("Standort / Position", [job.site.name, job.site.position].filter(Boolean).join(" · "))}${reportPair("Standortanschrift", [job.site.street, [job.site.zip, job.site.city].filter(Boolean).join(" ")].filter(Boolean).join(", "))}</div></section>
       <section class="report-section"><h2>Toranlage</h2><div class="report-data three">${reportPair("Hersteller", job.asset.manufacturer)}${reportPair("Torart", categoryLabel(job.asset.category))}${reportPair("Modell", modelLabel())}${reportPair("Baujahr", job.asset.year)}${reportPair("Fabrik- / Seriennummer", job.asset.serial)}${reportPair("Größe", size)}${reportPair("Antrieb", driveLabel())}${reportPair("Steuerung", controlLabel())}${reportPair("Betriebsart", job.drive.mode)}</div></section>
-      <section class="report-section"><h2>Arbeiten und Ergebnis</h2>${reportPair("Ausgeführte Tätigkeiten", activities)}<div class="report-text">${escapeHtml(display(job.work.description, "Keine zusätzliche Arbeitsbeschreibung."))}</div><div class="report-data three" style="margin-top:2.5mm">${reportPair("Ergebnis", job.report.result)}${reportPair("Nächster Prüftermin", formatDate(job.report.nextInspection))}${reportPair("Arbeitszeit", job.work.hours ? `${job.work.hours} Std.` : "—")}</div></section>
+      <section class="report-section"><h2>Arbeiten und Ergebnis</h2>${reportPair("Ausgeführte Tätigkeiten", activities)}<div class="report-text">${escapeHtml(display(job.work.description, "Keine zusätzliche Arbeitsbeschreibung."))}</div><div class="report-data three" style="margin-top:2.5mm">${reportPair("Ergebnis", job.report.result)}${reportPair("Nächster Prüftermin", formatDate(job.report.nextInspection))}${reportPair("Baustellenzeit", job.deployment.workStartedAt ? travel.formatDuration(workMinutes) : "—")}${reportPair("Mannstunden", personHours ? `${personHours.toLocaleString("de-DE", { maximumFractionDigits: 2 })} Std.` : "—")}${reportPair("Gefahrene Strecke", distanceText)}${reportPair("Fahrzeit", tripMinutes ? travel.formatDuration(tripMinutes) : "—")}</div></section>
       <section class="report-section"><h2>Festgestellte Mängel / Empfehlung</h2><div class="report-data"><div><span style="font-size:6.5px;color:#78878e;text-transform:uppercase">Mängel</span><div class="report-text">${escapeHtml(display(job.work.defects, issueRecords.length ? issueRecords.map((entry) => entry.label).join("; ") : "Keine Mängel dokumentiert."))}</div></div><div><span style="font-size:6.5px;color:#78878e;text-transform:uppercase">Empfehlung</span><div class="report-text">${escapeHtml(display(job.work.recommendation, job.report.note || "Keine zusätzliche Empfehlung."))}</div></div></div></section>
       <section class="report-section"><h2>Nachweise</h2><div class="report-data three">${reportPair("GPS", gps)}${reportPair("Fotos", `${photos.length} gespeichert`)}${reportPair("Sicherheitsausstattung", safety)}</div></section>
       <div class="report-signatures"><div class="report-signature">${job.signatures.technician ? `<img src="${job.signatures.technician}" alt="Unterschrift Techniker">` : ""}<strong>${escapeHtml(display(job.order.technician, "Techniker"))}</strong><small>Datum, Unterschrift Techniker</small></div><div class="report-signature">${job.signatures.customer ? `<img src="${job.signatures.customer}" alt="Unterschrift Kunde">` : ""}<strong>${escapeHtml(display(job.report.customerSigner, job.customer.contact || "Kunde / Betreiber"))}</strong><small>Datum, Unterschrift Kunde / Betreiber</small></div></div>
@@ -848,6 +1055,12 @@
     copy.completedAt = "";
     copy.order.number = makeOrderNumber();
     copy.order.date = localDate();
+    copy.deployment = {
+      ...newJob().deployment,
+      crewSize: copy.deployment.crewSize,
+      secondTechnician: copy.deployment.secondTechnician
+    };
+    copy.work.hours = "";
     copy.evidence.photos = [];
     copy.evidence.gps = null;
     copy.signatures = { technician: "", customer: "" };
@@ -869,6 +1082,7 @@
 
   function initializeJobView() {
     fillBoundFields();
+    renderDeployment();
     populateCategories();
     updateCatalogSelectors(false);
     renderChecklist();
@@ -922,6 +1136,10 @@
       scheduleSave();
     });
 
+    $("#captureTripStart").addEventListener("click", captureTripStart);
+    $("#captureTripEnd").addEventListener("click", captureTripEnd);
+    $("#startWorkTime").addEventListener("click", startWorkTime);
+    $("#finishWorkTime").addEventListener("click", finishWorkTime);
     $("#captureGps").addEventListener("click", captureGps);
     $("#photoInput").addEventListener("change", (event) => {
       addPhotos(event.target.files);

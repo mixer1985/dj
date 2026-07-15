@@ -17,8 +17,8 @@
 <body>
   <header class="app-header">
     <div class="brand" aria-label="Meyer Tore Service-App">
-      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-      <span><strong>MEYER TORE</strong><small>Service-App · Beta 2.0</small></span>
+      <img class="brand-logo" src="assets/meyertore-logo.png" alt=".meyertore – Vertrieb, Montage, Service">
+      <span class="brand-app-label">Service-App · Beta 2.0</span>
     </div>
     <div class="header-center">
       <span class="save-indicator" id="saveIndicator"><span></span> Gespeichert</span>
@@ -85,6 +85,46 @@
             <label class="field span-2"><span>Kundenreferenz / Bestellnummer</span><input data-bind="order.reference" placeholder="z. B. PO-4711 oder Ansprechpartner"></label>
             <label class="field"><span>Vertrag</span><select data-bind="order.contract"><option value="">Kein Vertrag gewählt</option><option>Wartungsvertrag</option><option>Einzelauftrag</option><option>Gewährleistung</option></select></label>
             <label class="field span-3"><span>Auftrag / gemeldete Störung</span><textarea data-bind="order.description" rows="4" placeholder="Was soll vor Ort gemacht oder geprüft werden?"></textarea></label>
+          </div>
+        </div>
+        <div class="form-card deployment-card">
+          <div class="deployment-heading">
+            <div><span class="eyebrow">Einsatzdaten</span><h2 class="card-title">Monteure, Baustellenzeit und Fahrt</h2><p>Abfahrt bei Meyer Tore erfassen, an der Baustelle ankommen und die Strecke automatisch übernehmen.</p></div>
+            <div class="crew-choice" role="group" aria-label="Anzahl der Monteure">
+              <label><input data-bind="deployment.crewSize" type="radio" value="1"><span><b>1</b> Mann</span></label>
+              <label><input data-bind="deployment.crewSize" type="radio" value="2"><span><b>2</b> Mann</span></label>
+            </div>
+          </div>
+          <label class="field second-technician" id="secondTechnicianField" hidden><span>Zweiter Monteur</span><input data-bind="deployment.secondTechnician" placeholder="Name des zweiten Monteurs" autocomplete="name"></label>
+          <div class="deployment-grid">
+            <section class="deployment-panel route-panel">
+              <header><span class="deployment-icon">↗</span><div><h3>Fahrt zur Baustelle</h3><p>Zwei GPS-Punkte genügen für die automatische Straßenstrecke.</p></div></header>
+              <div class="deployment-actions">
+                <button class="primary-button" id="captureTripStart" type="button">Abfahrt Firma erfassen</button>
+                <button class="secondary-button" id="captureTripEnd" type="button">Ankunft Baustelle</button>
+              </div>
+              <div class="route-timeline">
+                <div class="route-point" id="tripStartSummary"><i></i><div><strong>Firma · Am Stall 11</strong><small>Abfahrt noch nicht erfasst</small></div></div>
+                <div class="route-line"></div>
+                <div class="route-point" id="tripEndSummary"><i></i><div><strong>Baustelle</strong><small>Ankunft noch nicht erfasst</small></div></div>
+              </div>
+              <div class="route-results">
+                <label class="field"><span>Gefahrene Strecke</span><div class="input-unit"><input data-bind="deployment.distanceKm" id="tripDistance" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0,0"><span>km</span></div><small id="tripDistanceMethod">Wird nach der Ankunft automatisch berechnet</small></label>
+                <div class="deployment-metric"><span>Fahrzeit</span><strong id="tripDurationValue">—</strong><small>aus Abfahrt und Ankunft</small></div>
+              </div>
+            </section>
+            <section class="deployment-panel work-panel">
+              <header><span class="deployment-icon">◷</span><div><h3>Arbeitszeit Baustelle</h3><p>Startet bei der erfassten Ankunft automatisch oder kann manuell gestartet werden.</p></div></header>
+              <div class="deployment-actions">
+                <button class="primary-button" id="startWorkTime" type="button">Arbeitszeit starten</button>
+                <button class="secondary-button" id="finishWorkTime" type="button">Arbeitszeit beenden</button>
+              </div>
+              <div class="work-clock" id="workClock"><span>◷</span><div><strong>Noch nicht gestartet</strong><small>Baustellenzeit wird minutengenau gespeichert</small></div></div>
+              <div class="metric-grid">
+                <div class="deployment-metric"><span>Baustellenzeit</span><strong id="workDurationValue">—</strong><small>tatsächliche Dauer vor Ort</small></div>
+                <div class="deployment-metric highlight"><span>Mannstunden</span><strong id="personHoursValue">—</strong><small id="personHoursHint">1 Monteur × Arbeitszeit</small></div>
+              </div>
+            </section>
           </div>
         </div>
         <div class="quick-note"><strong>Schnellstart:</strong> Nur Pflichtfelder ausfüllen. Alle weiteren Angaben können direkt an der Anlage ergänzt werden.</div>
@@ -287,7 +327,7 @@
           </div>
           <div class="form-grid cols-2 top-gap">
             <label class="field"><span>Nächster Prüftermin</span><input data-bind="report.nextInspection" type="date"></label>
-            <label class="field"><span>Arbeitszeit gesamt</span><div class="input-unit"><input data-bind="work.hours" type="number" min="0" step="0.25" inputmode="decimal"><span>Std.</span></div></label>
+            <label class="field"><span>Mannstunden gesamt</span><div class="input-unit"><input data-bind="work.hours" type="number" min="0" step="0.25" inputmode="decimal"><span>Std.</span></div></label>
             <label class="field span-2"><span>Abschließender Hinweis an den Kunden</span><textarea data-bind="report.note" rows="3"></textarea></label>
           </div>
         </div>
@@ -320,6 +360,7 @@
 
   <script src="js/catalog.js"></script>
   <script src="js/checklists.js"></script>
+  <script src="js/travel.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

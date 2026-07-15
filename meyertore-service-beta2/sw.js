@@ -1,11 +1,13 @@
-const CACHE = "meyer-tore-beta2-v1";
+const CACHE = "meyer-tore-beta2-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./assets/styles.css",
   "./assets/app-icon.svg",
+  "./assets/meyertore-logo.png",
   "./js/catalog.js",
   "./js/checklists.js",
+  "./js/travel.js",
   "./js/app.js",
   "./manifest.webmanifest"
 ];
