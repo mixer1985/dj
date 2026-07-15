@@ -1,4 +1,4 @@
-const CACHE = "meyer-tore-beta2-v2";
+const CACHE = "meyer-tore-beta2-v3";
 const ASSETS = [
   "./",
   "./index.html",
